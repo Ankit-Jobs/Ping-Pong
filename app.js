@@ -17,14 +17,50 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 
 app.get('/', (req, res) => {
-  res.sendFile('index.html')
+  res.sendFile('login.html')
 })
 
+let players = []
+app.post('/login', (req, res) => {
+  console.log(players.length)
+  if (!players.length) {
+    players[0] = [req.body.name || "Guest"];
+
+    res.status(200).json({
+      id: 0,
+      room: 0
+    })
+  }
+  else if (players[players.length - 1]?.length < 2) {
+    players[players.length - 1].push(req.body.name || "Guest")
+    res.status(200).json({
+      id: 1,
+      room: players.length - 1
+    })
+  }
+  else {
+    players[players.length] = [req.body.name]
+    res.status(200).json({
+      id: 0,
+      room: players.length
+    })
+  }
+
+})
 const server = require('http').createServer(app);
-const io = socketIO(server)
+const io = socketIO(server);
 io.on('connection', socket => {
+  socket.on('join', player => {
+    io.emit('players', players[player.room]?.length)
+  })
   socket.on('pos', pos => {
     socket.broadcast.emit('posIncoming', pos)
+  })
+  socket.on('ballPos', ballPos => {
+    socket.broadcast.emit('ballPos', ballPos)
+  })
+  socket.on('start', m => {
+    socket.broadcast.emit('start', true)
   })
 })
 

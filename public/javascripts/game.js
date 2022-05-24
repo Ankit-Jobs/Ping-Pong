@@ -5,6 +5,18 @@ let ctx = canvas.getContext("2d");
 let go = "down";
 let go2 = "right";
 
+window.onload = () => {
+    if (!localStorage.getItem('room')) {
+        location.href = '/'
+    }
+    socket.emit('join', {
+        id: localStorage.getItem('id'),
+        room: localStorage.getItem('room')
+    })
+}
+
+let players = 0;
+
 class Bat {
     constructor(xPos, yPos, width, height) {
         this.width = width;
@@ -99,7 +111,15 @@ class Ball {
         ctx.beginPath();
         ctx.arc(this.position.x, this.position.y, 5, 0, 360, false);
         ctx.stroke();
-        this.move();
+        if (localStorage.getItem('id') === '0') {
+            this.move();
+        }
+        else {
+            socket.on('ballPos', ({ ball }) => {
+                this.setPosition(ball.x, ball.y)
+            })
+            // this.move()
+        }
         return 1;
     };
 }
@@ -149,19 +169,41 @@ class Game {
         this.bat2 = new Bat(10, canvas.height - 30, 50, 10);
         this.ball = new Ball(40, 40);
         this.moveBat();
-        this.animate();
+
     }
 
     animate = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        socket.on('posIncoming', ({ bat1, bat2 }) => {
+            if (localStorage.getItem('id') === '1') {
+                this.bat.setPosition(bat1.x, bat1.y)
+            }
+            else {
+                this.bat2.setPosition(bat2.x, bat2.y)
+            }
+        })
         Object.keys(this.keyconstraints).forEach((key) => {
             if (this.keyconstraints[key].pressed) {
-                this.keyconstraints[key].do();
-                // socket.emit('pos', {
-                //     this.keyconstraints.
-                // })
+                if (key === 'a' || key === 'd') {
+                    localStorage.getItem('id') === '1' && this.keyconstraints[key].do();
+                }
+                else {
+                    localStorage.getItem('id') === '0' && this.keyconstraints[key].do()
+                }
+                if (localStorage.getItem('id') === '0') {
+                    socket.emit('pos', {
+                        bat1: this.bat.position,
+                    })
+                }
+                else {
+                    socket.emit('pos', {
+                        bat2: this.bat2.position
+                    })
+                }
+
             }
         });
+
         const gameRunning = this.ball.draw(
             this.bat.position,
             this.bat2.position,
@@ -176,6 +218,11 @@ class Game {
         }
         this.bat.draw();
         this.bat2.draw();
+        if (localStorage.getItem('id') === '0') {
+            socket.emit('ballPos', {
+                ball: this.ball.position
+            })
+        }
         window.requestAnimationFrame(this.animate);
     };
 
@@ -202,6 +249,25 @@ class Game {
         });
     };
 }
-
 const game = new Game();
+socket.on('players', player => {
+    if (player === 2) {
+        console.log(player, localStorage.getItem('id'))
+        if (localStorage.getItem('id') === '0') {
+            let start = document.createElement('button');
+            start.textContent = 'Start';
+            document.body.appendChild(start)
+            start.onclick = () => {
+                game.animate();
+                socket.emit('start', true)
+            }
+        }
+    }
+})
 
+
+
+socket.on('start', msg => {
+    console.log('here')
+    game.animate();
+})
